@@ -10,6 +10,10 @@ body {
 .container > * {
   flex: 1;
 }
+
+.container > * {
+  margin: 1rem;
+}
 .map {
   height: 300;
 }
@@ -21,6 +25,41 @@ li {
   color: cornSilk;
 }
 </style>
+    <script>
+      function addMarkers(map, places){
+        map.markers = [];
+        places.forEach( place => {
+          addMarker(map, place);
+        });
+      }
+
+      function addMarker(map, place){
+        const marker = new mapboxgl.Marker({
+          properties: { title: 'foo' }
+}).setLngLat([place.lng*1, place.lat*1]);
+        marker.id = place.id;
+        marker.addTo(map);
+        map.markers.push(marker);
+      }
+
+      function setBounds(map, places){
+        const bounds = new mapboxgl.LngLatBounds();
+        places.forEach( place => {
+          const { lat, lng } = place;
+          bounds.extend([lng* 1, lat * 1]);
+        });
+        if(places.length){
+          map.fitBounds(bounds);
+        }
+      }
+
+function removeMarker(map, place){
+            const marker = map.markers.find( marker => marker.id === place.id);
+            marker.remove();
+            map.markers = map.markers.filter(m => m !== marker);
+}
+
+    </script>
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.1.0/mapbox-gl.js'></script>
 <link href='https://api.mapbox.com/mapbox-gl-js/v2.1.0/mapbox-gl.css' rel='stylesheet' />
   <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
@@ -34,103 +73,100 @@ li {
       const MAP_API_KEY = '<%= MAP_API_KEY %>';
       mapboxgl.accessToken = MAP_API_KEY;
 
-      function addMarkers(map, favorites){
-        map.markers = [];
-        favorites.forEach( restaurant => {
-          addMarker(map, restaurant);
-        });
-      }
 
-      function addMarker(map, restaurant){
-        const marker = new mapboxgl.Marker({
-          properties: { title: 'foo' }
-}).setLngLat([restaurant.lng*1, restaurant.lat*1]);
-        marker.id = restaurant.id;
-        marker.addTo(map);
-        map.markers.push(marker);
-      }
 
-      function setBounds(map, favorites){
-        const bounds = new mapboxgl.LngLatBounds();
-        favorites.forEach( restaurant => {
-          const { lat, lng } = restaurant;
-          bounds.extend([lng* 1, lat * 1]);
-        });
-        if(favorites.length){
-          map.fitBounds(bounds);
+      class PlaceMap extends React.Component{
+        componentDidUpdate(prevProps){
+          if(prevProps.center && this.props.places !== prevProps.places){
+            const removed = prevProps.places.find( place => !this.props.places.find(p => p.id === place.id ))
+            if(removed){
+              removeMarker(this.map, removed);
+              setBounds(this.map, this.props.places);
+            }
+
+            const added = this.props.places.find( place => !prevProps.places.find(p => p.id === place.id));
+            if(added){
+              addMarker(this.map, added);
+              setBounds(this.map, this.props.places);
+            }
+          }
+          if(!prevProps.center && this.props.center){
+            const center = this.props.center;
+            const places = this.props.places;
+            this.map = new mapboxgl.Map({
+              container: this.el, // container ID
+              style: 'mapbox://styles/mapbox/streets-v11', // style URL
+              center: [center.lng*1, center.lat*1], // starting position [lng, lat]
+              zoom: 9 // starting zoom
+            });
+            setBounds(this.map, places);
+            addMarkers(this.map, places);
+          }
+          
         }
-      } 
+        render(){
+          return (
+            <div className='map' ref={ el => this.el = el} />
+          );
+        }
+      }
+
+
+
+
 
       class App extends React.Component{
         constructor(){
           super();
           this.state = {
-            restaurants: []
+            places: [],
+            loaded: false
           };
           this.toggle = this.toggle.bind(this);
         }
-        async toggle(restaurant){
-          const response = await fetch(`/api/restaurants/${restaurant.id}`, {
+        async toggle(place){
+          const response = await fetch(`/api/places/${place.id}`, {
             method: 'PUT',
-            body: JSON.stringify({ isFavorite: !restaurant.isFavorite }),
+            body: JSON.stringify({ isFavorite: !place.isFavorite }),
             headers: {
               'content-type': 'application/json'
             }
           })
           const data = await response.json();
-          if(!data.isFavorite){
-            const marker = this.map.markers.find( marker => marker.id === restaurant.id);
-            marker.remove();
-            this.map.markers = this.map.markers.filter(m => m !== marker);
-          }
-          else {
-            addMarker(this.map, data);
-          }
-          const restaurants = this.state.restaurants.map( _restaurant => _restaurant.id === data.id ? data : _restaurant);
-          this.setState({ restaurants });
-          const favorites = restaurants.filter( restaurant => restaurant.isFavorite);
-          setBounds(this.map, favorites);
+          const places = this.state.places.map( _place => _place.id === data.id ? data : _place);
+          this.setState({ places });
         }
         async componentDidMount(){
-          const response = await fetch('/api/restaurants');
-          const restaurants = await response.json();
+          const response = await fetch('/api/places');
+          const places = await response.json();
           this.setState({
-            restaurants
-          });
-          this.map = new mapboxgl.Map({
-            container: this.el, // container ID
-            style: 'mapbox://styles/mapbox/streets-v11', // style URL
-            center: [restaurants[0].lng*1, restaurants[0].lat*1], // starting position [lng, lat]
-            zoom: 9 // starting zoom
-          });
-          const favorites = restaurants.filter( restaurant => restaurant.isFavorite);
-          this.map.on('load', ()=> {
-            if(favorites.length){
-              setBounds(this.map, favorites);
-              addMarkers(this.map, favorites);
-            }
+            places
           });
         }
         render(){
-          const { restaurants } = this.state;
-          const { toggle } = this;
+          const { places } = this.state;
+          const { toggle, ready } = this;
+          const favorites = places.filter(p=> p.isFavorite);
+          const favoritesCenter = favorites.length ? favorites[0] : places[0];
+          const notFavorites = places.filter(p=> !p.isFavorite);
+          const notFavoritesCenter = notFavorites.length ? notFavorites[0] : places[0];
+
           return (
             <div className='container'>
               <ul>
                 {
-                  restaurants.map( restaurant => {
+                  places.map( place => {
                     return (
-                      <li key={restaurant.id} className={ restaurant.isFavorite ? 'favorite': ''} onClick={ ()=> toggle(restaurant)}>
-                        { restaurant.name }
+                      <li key={place.id} className={ place.isFavorite ? 'favorite': ''} onClick={ ()=> toggle(place)}>
+                        { place.name }
                       </li>
                       
                     );
                   })
                 }
               </ul>
-              <div>
-                <div className='map' ref={ el => this.el = el} />
-              </div>
+              <PlaceMap places={ favorites } center={ favoritesCenter} />
+              <PlaceMap places={ notFavorites } center={ notFavoritesCenter} />
             </div>
           );
         }

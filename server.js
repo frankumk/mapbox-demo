@@ -10,20 +10,20 @@ const Sequelize = require('sequelize');
 const { STRING, DECIMAL, BOOLEAN } = Sequelize;
 const conn = new Sequelize(process.env.DATABASE_URL || 'postgres://localhost/acme_db');
 
-const Restaurant = conn.define('restaurants', {
+const Place = conn.define('place', {
   name: STRING,
   lat: DECIMAL, 
   lng: DECIMAL,
   isFavorite: {
     type: BOOLEAN,
-    defaultValue: true
+    defaultValue: false
   } 
 });
 
 const syncAndSeed = async()=> {
   await conn.sync({ force: true });
-  await Promise.all(require('./restaurants').map(({ name, place: { location: [ lng, lat]} }) => {
-    return Restaurant.create({
+  await Promise.all(require('./places').map(({ name, place: { location: [ lng, lat]} }) => {
+    return Place.create({
       name,
       lat,
       lng
@@ -43,20 +43,20 @@ app.get('/', (req, res, next)=> {
   });
 });
 
-app.get('/api/restaurants', async(req, res, next)=> {
+app.get('/api/places', async(req, res, next)=> {
   try {
-    res.send(await Restaurant.findAll({ order: [['name']]}));
+    res.send(await Place.findAll({ order: [['lat', 'desc']]}));
   }
   catch(ex){
     next(ex);
   }
 });
 
-app.put('/api/restaurants/:id', async(req, res, next)=> {
+app.put('/api/places/:id', async(req, res, next)=> {
   try {
-    const restaurant = await Restaurant.findByPk(req.params.id);
-    await restaurant.update(req.body);
-    res.send(restaurant);
+    const place = await Place.findByPk(req.params.id);
+    await place.update(req.body);
+    res.send(place);
   }
   catch(ex){
     next(ex);

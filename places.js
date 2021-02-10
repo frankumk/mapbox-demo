@@ -218,5 +218,24 @@ module.exports = [
     place: {
       location: [-73.97613648603168, 40.77675017163841 ]
     }
+  },
+  {
+    name: 'Katz\'s Deli',
+    place: {
+      location: [-73.98739680699529,40.72243623785117]
+    }
+  },
+  {
+    name: 'Milbrook diner',
+    place: {
+      location: [-73.69530527801548, 41.78676179587256 ]
+    }
+  },
+  {
+    name: 'Galleria Mall',
+    place: {
+      location: [-73.9206301219385,41.62646469186266 ]
+    }
   }
 ];
+
