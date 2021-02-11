@@ -26,6 +26,14 @@ li {
 }
 </style>
     <script>
+      function generateMap(el, center){
+        return new mapboxgl.Map({
+          container: el, // container ID
+          style: 'mapbox://styles/mapbox/streets-v11', 
+          center: [center.lng*1, center.lat*1], 
+          zoom: 9 
+        });
+      }
       function addMarkers(map, places){
         map.markers = [];
         places.forEach( place => {
@@ -53,18 +61,18 @@ li {
         }
       }
 
-function removeMarker(map, place){
-            const marker = map.markers.find( marker => marker.id === place.id);
-            marker.remove();
-            map.markers = map.markers.filter(m => m !== marker);
-}
+      function removeMarker(map, place){
+        const marker = map.markers.find( marker => marker.id === place.id);
+        marker.remove();
+        map.markers = map.markers.filter(m => m !== marker);
+      }
 
     </script>
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.1.0/mapbox-gl.js'></script>
-<link href='https://api.mapbox.com/mapbox-gl-js/v2.1.0/mapbox-gl.css' rel='stylesheet' />
-  <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.1.0/mapbox-gl.css' rel='stylesheet' />
+    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
   </head>
   <body>
     <div id='root'></div>
@@ -74,53 +82,40 @@ function removeMarker(map, place){
       mapboxgl.accessToken = MAP_API_KEY;
 
 
-
-      class PlaceMap extends React.Component{
+      class MyMap extends React.Component{
+        componentDidMount(){
+        }
         componentDidUpdate(prevProps){
-          if(prevProps.center && this.props.places !== prevProps.places){
-            const removed = prevProps.places.find( place => !this.props.places.find(p => p.id === place.id ))
-            if(removed){
-              removeMarker(this.map, removed);
-              setBounds(this.map, this.props.places);
-            }
+          if(!prevProps.center && this.props.center){
+            this.map = generateMap(this.el, this.props.center);
+            setBounds(this.map, this.props.places);
+            addMarkers(this.map, this.props.places);
+          }
+          if(prevProps.center && prevProps.places.length !== this.props.places.length){
 
-            const added = this.props.places.find( place => !prevProps.places.find(p => p.id === place.id));
+            const added = this.props.places.find(place => !prevProps.places.find(p => p.id === place.id));
             if(added){
               addMarker(this.map, added);
               setBounds(this.map, this.props.places);
             }
+            const removed = prevProps.places.find(place => !this.props.places.find(p => p.id === place.id));
+            if(removed){
+              removeMarker(this.map, removed);
+              setBounds(this.map, this.props.places);
+            }
           }
-          if(!prevProps.center && this.props.center){
-            const center = this.props.center;
-            const places = this.props.places;
-            this.map = new mapboxgl.Map({
-              container: this.el, // container ID
-              style: 'mapbox://styles/mapbox/streets-v11', // style URL
-              center: [center.lng*1, center.lat*1], // starting position [lng, lat]
-              zoom: 9 // starting zoom
-            });
-            setBounds(this.map, places);
-            addMarkers(this.map, places);
-          }
-          
         }
         render(){
-          return (
-            <div className='map' ref={ el => this.el = el} />
-          );
+          return <div className='map' ref={el => this.el = el}></div>
         }
       }
-
-
-
 
 
       class App extends React.Component{
         constructor(){
           super();
           this.state = {
-            places: [],
-            loaded: false
+            places: []
           };
           this.toggle = this.toggle.bind(this);
         }
@@ -145,12 +140,11 @@ function removeMarker(map, place){
         }
         render(){
           const { places } = this.state;
-          const { toggle, ready } = this;
-          const favorites = places.filter(p=> p.isFavorite);
-          const favoritesCenter = favorites.length ? favorites[0] : places[0];
-          const notFavorites = places.filter(p=> !p.isFavorite);
-          const notFavoritesCenter = notFavorites.length ? notFavorites[0] : places[0];
-
+          const { toggle } = this;
+          const favorites = places.filter( place => place.isFavorite);
+          const notFavorites = places.filter( place => !place.isFavorite);
+          const center = favorites.length ? favorites[0] : places[0]
+          const notFavoriteCenter = notFavorites.length ? notFavorites[0] : places[0];
           return (
             <div className='container'>
               <ul>
@@ -165,8 +159,8 @@ function removeMarker(map, place){
                   })
                 }
               </ul>
-              <PlaceMap places={ favorites } center={ favoritesCenter} />
-              <PlaceMap places={ notFavorites } center={ notFavoritesCenter} />
+              <MyMap places={ favorites } center={ center }/>
+              <MyMap places={ notFavorites } center={ notFavoriteCenter }/>
             </div>
           );
         }

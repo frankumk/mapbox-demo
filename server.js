@@ -22,11 +22,12 @@ const Place = conn.define('place', {
 
 const syncAndSeed = async()=> {
   await conn.sync({ force: true });
-  await Promise.all(require('./places').map(({ name, place: { location: [ lng, lat]} }) => {
+  await Promise.all(require('./places').map(({ isFavorite, name, location: [ lng, lat] }) => {
     return Place.create({
       name,
       lat,
-      lng
+      lng,
+      isFavorite
     });
   }));
 };
@@ -42,6 +43,7 @@ app.get('/', (req, res, next)=> {
     MAP_API_KEY: process.env.MAP_API_KEY
   });
 });
+
 
 app.get('/api/places', async(req, res, next)=> {
   try {
